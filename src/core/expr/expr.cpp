@@ -147,7 +147,7 @@ std::vector<std::string_view> tokenize(const std::string &expr)
     while (it != expr.end()) {
         char c = *it;
 
-        if (std::isspace(c)) {
+        if (std::isspace(static_cast<unsigned char>(c))) {
             if (it != prev)
                 tokens.push_back({ expr.c_str() + (prev - expr.begin()), static_cast<size_t>(it - prev) });
             prev = it + 1;
@@ -215,6 +215,29 @@ ExprOp decodeToken(std::string_view token)
             throw std::runtime_error("failed to convert '" + stoken + "' to float, not the whole token could be converted");
         return{ ExprOpType::CONSTANT, f };
     }
+}
+
+unsigned expressionTreeDepth(const ExpressionTreeNode *root)
+{
+    // Computed iteratively: the optimizer and code generator walk the tree
+    // recursively, so even measuring the depth must not recurse.
+    std::vector<std::pair<const ExpressionTreeNode *, unsigned>> worklist;
+    unsigned maxDepth = 0;
+
+    if (root)
+        worklist.push_back({ root, 1 });
+
+    while (!worklist.empty()) {
+        auto entry = worklist.back();
+        worklist.pop_back();
+        maxDepth = std::max(maxDepth, entry.second);
+        if (entry.first->left)
+            worklist.push_back({ entry.first->left, entry.second + 1 });
+        if (entry.first->right)
+            worklist.push_back({ entry.first->right, entry.second + 1 });
+    }
+
+    return maxDepth;
 }
 
 ExpressionTree parseExpr(const std::string &expr, const VSVideoInfo * const srcFormats[], int numInputs)
@@ -336,6 +359,15 @@ ExpressionTree parseExpr(const std::string &expr, const VSVideoInfo * const srcF
         throw std::runtime_error("unconsumed values on stack: " + expr);
 
     tree.setRoot(stack.back());
+
+    // The expression nesting depth maps directly to native recursion depth in
+    // the optimizer and code generator. Reject pathologically deep expressions
+    // -- orders of magnitude beyond any realistic one, yet well below the depth
+    // that would exhaust the stack -- so a crafted expression cannot overflow.
+    constexpr unsigned max_tree_depth = 10000;
+    if (expressionTreeDepth(stack.back()) > max_tree_depth)
+        throw std::runtime_error("expression too deeply nested");
+
     return tree;
 }
 

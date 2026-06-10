@@ -239,7 +239,7 @@ static void outputFrame(const VSFrame *frame, VSPipeOutputData *data) {
                 int p = (fi->colorFamily == cfRGB) ? rgbRemap[rp] : rp;
                 ptrdiff_t stride = data->vsapi->getStride(frame, p);
                 const uint8_t *readPtr = data->vsapi->getReadPtr(frame, p);
-                int rowSize = data->vsapi->getFrameWidth(frame, p) * fi->bytesPerSample;
+                ptrdiff_t rowSize = static_cast<ptrdiff_t>(data->vsapi->getFrameWidth(frame, p)) * fi->bytesPerSample;
                 int height = data->vsapi->getFrameHeight(frame, p);
 
                 if (rowSize != stride) {
@@ -247,7 +247,8 @@ static void outputFrame(const VSFrame *frame, VSPipeOutputData *data) {
                     readPtr = data->buffer.data();
                 }
 
-                if (fwrite(readPtr, 1, rowSize * height, data->outFile) != static_cast<size_t>(rowSize * height)) {
+                size_t bytesToWrite = static_cast<size_t>(rowSize) * height;
+                if (fwrite(readPtr, 1, bytesToWrite, data->outFile) != bytesToWrite) {
                     if (data->errorMessage.empty())
                         data->errorMessage = "Error: fwrite() call failed when writing frame: " + std::to_string(data->outputFrames) + ", plane: " + std::to_string(p) +
                         ", errno: " + std::to_string(errno);
@@ -423,9 +424,9 @@ static void VS_CC frameDoneCallback(void *userData, const VSFrame *f, int n, VSN
                 fprintf(stderr, "Frame: %d/%d\r", data->completedFrames, data->totalFrames);
         } else {
             if (hasMeaningfulFPS)
-                fprintf(stderr, "Sample: %" PRId64 "/%" PRId64 " (%.2f sps)\r", static_cast<int64_t>(data->completedFrames * VS_AUDIO_FRAME_SAMPLES), static_cast<int64_t>(data->totalFrames * VS_AUDIO_FRAME_SAMPLES), fps);
+                fprintf(stderr, "Sample: %" PRId64 "/%" PRId64 " (%.2f sps)\r", static_cast<int64_t>(data->completedFrames) * VS_AUDIO_FRAME_SAMPLES, static_cast<int64_t>(data->totalFrames) * VS_AUDIO_FRAME_SAMPLES, fps);
             else
-                fprintf(stderr, "Sample: %" PRId64 "/%" PRId64 "\r", static_cast<int64_t>(data->completedFrames * VS_AUDIO_FRAME_SAMPLES), static_cast<int64_t>(data->totalFrames * VS_AUDIO_FRAME_SAMPLES));
+                fprintf(stderr, "Sample: %" PRId64 "/%" PRId64 "\r", static_cast<int64_t>(data->completedFrames) * VS_AUDIO_FRAME_SAMPLES, static_cast<int64_t>(data->totalFrames) * VS_AUDIO_FRAME_SAMPLES);
         }
     }
 
@@ -528,7 +529,7 @@ static bool initializeVideoOutput(VSPipeOutputData *data) {
         }
     }
 
-    data->buffer.resize(vi->width * vi->height * vi->format.bytesPerSample);
+    data->buffer.resize(static_cast<size_t>(vi->width) * vi->height * vi->format.bytesPerSample);
     return true;
 }
 

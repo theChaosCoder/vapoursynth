@@ -974,12 +974,30 @@ public:
     {
         size_t size;
         if (jit::GetCode() && (size = GetCodeSize())) {
+            // Emit into a writable, non-executable buffer, then flip it to
+            // read+execute so the code pages are never simultaneously writable
+            // and executable (W^X).
 #ifdef VS_TARGET_OS_WINDOWS
-            void *ptr = VirtualAlloc(nullptr, size, MEM_COMMIT, PAGE_EXECUTE_READWRITE);
-#else
-            void *ptr = mmap(nullptr, size, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_ANON | MAP_PRIVATE, 0, 0);
-#endif
+            void *ptr = VirtualAlloc(nullptr, size, MEM_COMMIT, PAGE_READWRITE);
+            if (!ptr)
+                return { nullptr, 0 };
             memcpy(ptr, jit::GetCode(), size);
+            DWORD oldProtect;
+            if (!VirtualProtect(ptr, size, PAGE_EXECUTE_READ, &oldProtect)) {
+                VirtualFree(ptr, 0, MEM_RELEASE);
+                return { nullptr, 0 };
+            }
+            FlushInstructionCache(GetCurrentProcess(), ptr, size);
+#else
+            void *ptr = mmap(nullptr, size, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, 0, 0);
+            if (ptr == MAP_FAILED)
+                return { nullptr, 0 };
+            memcpy(ptr, jit::GetCode(), size);
+            if (mprotect(ptr, size, PROT_READ | PROT_EXEC) != 0) {
+                munmap(ptr, size);
+                return { nullptr, 0 };
+            }
+#endif
             return { reinterpret_cast<ProcessLineProc>(ptr), size };
         }
         return { nullptr, 0 };
@@ -1656,12 +1674,30 @@ public:
     {
         size_t size;
         if (jit::GetCode(true) && (size = GetCodeSize())) {
+            // Emit into a writable, non-executable buffer, then flip it to
+            // read+execute so the code pages are never simultaneously writable
+            // and executable (W^X).
 #ifdef VS_TARGET_OS_WINDOWS
-            void *ptr = VirtualAlloc(nullptr, size, MEM_COMMIT, PAGE_EXECUTE_READWRITE);
-#else
-            void *ptr = mmap(nullptr, size, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_ANON | MAP_PRIVATE, 0, 0);
-#endif
+            void *ptr = VirtualAlloc(nullptr, size, MEM_COMMIT, PAGE_READWRITE);
+            if (!ptr)
+                return { nullptr, 0 };
             memcpy(ptr, jit::GetCode(true), size);
+            DWORD oldProtect;
+            if (!VirtualProtect(ptr, size, PAGE_EXECUTE_READ, &oldProtect)) {
+                VirtualFree(ptr, 0, MEM_RELEASE);
+                return { nullptr, 0 };
+            }
+            FlushInstructionCache(GetCurrentProcess(), ptr, size);
+#else
+            void *ptr = mmap(nullptr, size, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, 0, 0);
+            if (ptr == MAP_FAILED)
+                return { nullptr, 0 };
+            memcpy(ptr, jit::GetCode(true), size);
+            if (mprotect(ptr, size, PROT_READ | PROT_EXEC) != 0) {
+                munmap(ptr, size);
+                return { nullptr, 0 };
+            }
+#endif
             return { reinterpret_cast<ProcessLineProc>(ptr), size };
         }
         return { nullptr, 0 };

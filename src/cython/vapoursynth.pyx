@@ -2277,6 +2277,8 @@ cdef class VideoNode(RawNode):
                     y4mformat = '411'
                 elif self.format.subsampling_w == 0 and self.format.subsampling_h == 1:
                     y4mformat = '440'
+                else:
+                    raise ValueError("No y4m identifier exists for the current YUV subsampling")
                 if self.format.bits_per_sample > 8:
                     y4mformat = y4mformat + 'p' + str(self.format.bits_per_sample)
             else:
@@ -2504,38 +2506,44 @@ cdef class AudioNode(RawNode):
 
             void (*pack_func)(const uint8_t *const *const, uint8_t *, size_t, size_t) noexcept nogil
 
-        if progress_update is not None:
+        if not interleave_buffer or not src_ptrs:
+            free(interleave_buffer)
+            free(src_ptrs)
+            raise Error("Failed to allocate output buffers")
+
+        # Everything from here until the streaming loop can raise (progress
+        # callback, header creation, fileobj.write); free both buffers if it
+        # does so they do not leak. The loop itself frees them in its finally.
+        try:
+            if progress_update is not None:
                 progress_update(0, self.num_frames)
 
-        if w64:
-            if not CreateWave64Header(
-                w64hdr,
-                self.sample_type == SampleType.FLOAT,
-                self.bits_per_sample,
-                self.sample_rate,
-                self.channel_layout,
-                self.num_samples,
-            ):
-                raise Error("Failed to create WAVE64 header")
-            fileobj.write((<char *>&w64hdr)[:sizeof(Wave64Header)])
-        elif wav:
-            if not CreateWaveHeader(
-                whdr,
-                self.sample_type == SampleType.FLOAT,
-                self.bits_per_sample,
-                self.sample_rate,
-                self.channel_layout,
-                self.num_samples,
-            ):
-                raise Error("Failed to create WAV header")
-            fileobj.write((<char *>&whdr)[:sizeof(WaveHeader)])
-
-        if not interleave_buffer:
-            raise Error("Failed to allocate interleave buffer")
-
-        if not src_ptrs:
+            if w64:
+                if not CreateWave64Header(
+                    w64hdr,
+                    self.sample_type == SampleType.FLOAT,
+                    self.bits_per_sample,
+                    self.sample_rate,
+                    self.channel_layout,
+                    self.num_samples,
+                ):
+                    raise Error("Failed to create WAVE64 header")
+                fileobj.write((<char *>&w64hdr)[:sizeof(Wave64Header)])
+            elif wav:
+                if not CreateWaveHeader(
+                    whdr,
+                    self.sample_type == SampleType.FLOAT,
+                    self.bits_per_sample,
+                    self.sample_rate,
+                    self.channel_layout,
+                    self.num_samples,
+                ):
+                    raise Error("Failed to create WAV header")
+                fileobj.write((<char *>&whdr)[:sizeof(WaveHeader)])
+        except:
+            free(src_ptrs)
             free(interleave_buffer)
-            raise Error("Failed to allocate source pointers array")
+            raise
 
         if bytes_per_output_sample == 2:
             pack_func = PackChannels16to16le

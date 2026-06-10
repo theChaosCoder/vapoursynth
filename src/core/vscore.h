@@ -948,7 +948,7 @@ private:
     std::unordered_map<NodeOutputKey, PVSFrameContext> allContexts;
     std::condition_variable newWork;
     std::condition_variable allIdle;
-    size_t activeThreads;
+    std::atomic<size_t> activeThreads;
     size_t idleThreads;
     size_t reqCounter;
     size_t reqMemCounter;

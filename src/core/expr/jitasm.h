@@ -1499,7 +1499,10 @@ namespace detail
 			}
 			if (codesize) {
 #if defined(JITASM_WIN)
-				void* pbuff = ::VirtualAlloc(NULL, codesize, MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+				// Staging buffer for assembled code; it is copied into a
+				// separate executable buffer and never executed in place, so it
+				// does not need to be executable (W^X).
+				void* pbuff = ::VirtualAlloc(NULL, codesize, MEM_COMMIT, PAGE_READWRITE);
 				if (!pbuff) {
 					JITASM_ASSERT(0);
 					return false;
@@ -1510,8 +1513,11 @@ namespace detail
 #else
 				int pagesize = getpagesize();
 				size_t buffsize = (codesize + pagesize - 1) / pagesize * pagesize;
-				void* pbuff = mmap(NULL, buffsize, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANON, -1, 0);
-				if (!pbuff) {
+				// Staging buffer for assembled code; it is copied into a separate
+				// executable buffer and never executed in place, so it does not
+				// need to be executable (W^X).
+				void* pbuff = mmap(NULL, buffsize, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
+				if (pbuff == MAP_FAILED) {
 					JITASM_ASSERT(0);
 					return false;
 				}
