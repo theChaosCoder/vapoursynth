@@ -38,6 +38,7 @@
 #include <Windows.h>
 #else
 #include <dlfcn.h>
+#include <unistd.h>
 #endif
 
 static std::once_flag flag;
@@ -164,7 +165,12 @@ static void realInit() VS_NOEXCEPT {
 #ifdef VS_TARGET_OS_WINDOWS
         _wsystem(L"vapoursynth config >NUL 2>&1");
 #else
-        system("vapoursynth config >/dev/null 2>&1");
+        // Auto-configuration runs the `vapoursynth` command resolved through
+        // PATH. Skip it under elevated privileges, where a hostile PATH could
+        // select an attacker-controlled binary; such users can run
+        // `vapoursynth config` manually instead.
+        if (getuid() == geteuid() && getgid() == getegid())
+            system("vapoursynth config >/dev/null 2>&1");
 #endif
         std::tie(pythonExePath, pythonSymbolPath) = readEnvConfig(vsscriptPath);
     }
