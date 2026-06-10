@@ -2277,6 +2277,8 @@ cdef class VideoNode(RawNode):
                     y4mformat = '411'
                 elif self.format.subsampling_w == 0 and self.format.subsampling_h == 1:
                     y4mformat = '440'
+                else:
+                    raise ValueError("No y4m identifier exists for the current YUV subsampling")
                 if self.format.bits_per_sample > 8:
                     y4mformat = y4mformat + 'p' + str(self.format.bits_per_sample)
             else:
