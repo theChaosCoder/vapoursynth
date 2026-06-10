@@ -305,6 +305,12 @@ static void VS_CC exprCreate(const VSMap *in, VSMap *out, void *userData, VSCore
             }
         }
 
+        // The output format must be one the code generator can store (the same
+        // set the inputs are restricted to); otherwise the store falls through
+        // to the 1-byte default and leaks uninitialized frame memory.
+        if (!is8to16orFloatFormat(d->vi.format, EXPR_F16C_TEST))
+            throw std::runtime_error(invalidVideoFormatMessage(d->vi.format, vsapi, nullptr, EXPR_F16C_TEST));
+
         int nexpr = vsapi->mapNumElements(in, "expr");
         if (nexpr > d->vi.format.numPlanes)
             throw std::runtime_error("More expressions given than there are planes");
