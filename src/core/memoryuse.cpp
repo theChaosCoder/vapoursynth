@@ -246,13 +246,25 @@ void MemoryUse::deallocate(uint8_t *buf)
     else
         deallocate_to_system(raw_ptr, size);
 
-    if (m_core_freed && m_allocated == 0) {
-        delete this;
-        return;
-    }
-
     if (to_freelist)
         gc_freelist();
+
+    try_delete();
+}
+
+void MemoryUse::try_delete()
+{
+    // Exactly one caller must delete the allocator: the deallocation that
+    // empties the last working buffer, or on_core_freed() when the core is
+    // freed while already idle. Both check the same terminal condition, so the
+    // delete is claimed atomically to prevent the two paths from racing into a
+    // double free. After the core is freed an empty allocator stays empty (only
+    // the core allocates from the zero-memory state), so the condition is
+    // stable once observed.
+    if (m_core_freed && m_allocated == 0) {
+        if (!m_delete_claimed.exchange(true))
+            delete this;
+    }
 }
 
 size_t MemoryUse::set_limit(size_t bytes)
@@ -264,15 +276,8 @@ size_t MemoryUse::set_limit(size_t bytes)
 
 void MemoryUse::on_core_freed()
 {
-    bool was_idle = m_allocated == 0;
-
     m_core_freed = true;
-
-    // Only the core can create a new allocation from the zero-memory state.
-    if (was_idle) {
-        assert(!m_allocated);
-        delete this;
-    }
+    try_delete();
 }
 
 } // namespace vs

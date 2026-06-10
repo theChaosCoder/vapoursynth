@@ -51,6 +51,7 @@ class MemoryUse {
     std::atomic_size_t m_limit{ 0 };
 
     std::atomic_bool m_core_freed{ false };
+    std::atomic_bool m_delete_claimed{ false };
 
     static uint8_t *init_block(uint8_t *raw_ptr, size_t allocation_size);
 
@@ -69,6 +70,8 @@ class MemoryUse {
     void deallocate_to_freelist(uint8_t *ptr, size_t size);
 
     void gc_freelist();
+
+    void try_delete();
 public:
     MemoryUse();
 
