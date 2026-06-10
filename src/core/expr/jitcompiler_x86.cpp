@@ -976,8 +976,12 @@ public:
         if (jit::GetCode() && (size = GetCodeSize())) {
 #ifdef VS_TARGET_OS_WINDOWS
             void *ptr = VirtualAlloc(nullptr, size, MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+            if (!ptr)
+                return { nullptr, 0 };
 #else
             void *ptr = mmap(nullptr, size, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_ANON | MAP_PRIVATE, 0, 0);
+            if (ptr == MAP_FAILED)
+                return { nullptr, 0 };
 #endif
             memcpy(ptr, jit::GetCode(), size);
             return { reinterpret_cast<ProcessLineProc>(ptr), size };
@@ -1658,8 +1662,12 @@ public:
         if (jit::GetCode(true) && (size = GetCodeSize())) {
 #ifdef VS_TARGET_OS_WINDOWS
             void *ptr = VirtualAlloc(nullptr, size, MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+            if (!ptr)
+                return { nullptr, 0 };
 #else
             void *ptr = mmap(nullptr, size, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_ANON | MAP_PRIVATE, 0, 0);
+            if (ptr == MAP_FAILED)
+                return { nullptr, 0 };
 #endif
             memcpy(ptr, jit::GetCode(true), size);
             return { reinterpret_cast<ProcessLineProc>(ptr), size };
