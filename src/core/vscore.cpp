@@ -186,10 +186,10 @@ VSFrame::VSFrame(const VSVideoFormat &f, int width, int height, const VSFrame *p
     format.vf = f;
     numPlanes = format.vf.numPlanes;
 
-    stride[0] = (width * (f.bytesPerSample) + (alignment - 1)) & ~(alignment - 1);
+    stride[0] = (static_cast<ptrdiff_t>(width) * f.bytesPerSample + (alignment - 1)) & ~static_cast<ptrdiff_t>(alignment - 1);
 
     if (numPlanes == 3) {
-        int plane23 = ((width >> format.vf.subSamplingW) * (format.vf.bytesPerSample) + (alignment - 1)) & ~(alignment - 1);
+        ptrdiff_t plane23 = ((static_cast<ptrdiff_t>(width) >> format.vf.subSamplingW) * format.vf.bytesPerSample + (alignment - 1)) & ~static_cast<ptrdiff_t>(alignment - 1);
         stride[1] = plane23;
         stride[2] = plane23;
     } else {
@@ -197,9 +197,9 @@ VSFrame::VSFrame(const VSVideoFormat &f, int width, int height, const VSFrame *p
         stride[2] = 0;
     }
 
-    data[0] = new VSPlaneData(stride[0] * height, *core->memory);
+    data[0] = new VSPlaneData(static_cast<size_t>(stride[0]) * height, *core->memory);
     if (numPlanes == 3) {
-        size_t size23 = stride[1] * (height >> format.vf.subSamplingH);
+        size_t size23 = static_cast<size_t>(stride[1]) * (height >> format.vf.subSamplingH);
         data[1] = new VSPlaneData(size23, *core->memory);
         data[2] = new VSPlaneData(size23, *core->memory);
     }
@@ -220,10 +220,10 @@ VSFrame::VSFrame(const VSVideoFormat &f, int width, int height, const VSFrame * 
     format.vf = f;
     numPlanes = format.vf.numPlanes;
 
-    stride[0] = (width * (format.vf.bytesPerSample) + (alignment - 1)) & ~(alignment - 1);
+    stride[0] = (static_cast<ptrdiff_t>(width) * format.vf.bytesPerSample + (alignment - 1)) & ~static_cast<ptrdiff_t>(alignment - 1);
 
     if (numPlanes == 3) {
-        int plane23 = ((width >> format.vf.subSamplingW) * (format.vf.bytesPerSample) + (alignment - 1)) & ~(alignment - 1);
+        ptrdiff_t plane23 = ((static_cast<ptrdiff_t>(width) >> format.vf.subSamplingW) * format.vf.bytesPerSample + (alignment - 1)) & ~static_cast<ptrdiff_t>(alignment - 1);
         stride[1] = plane23;
         stride[2] = plane23;
     } else {
@@ -241,9 +241,9 @@ VSFrame::VSFrame(const VSVideoFormat &f, int width, int height, const VSFrame * 
             data[i]->add_ref();
         } else {
             if (i == 0) {
-                data[i] = new VSPlaneData(stride[i] * height, *core->memory);
+                data[i] = new VSPlaneData(static_cast<size_t>(stride[i]) * height, *core->memory);
             } else {
-                data[i] = new VSPlaneData(stride[i] * (height >> format.vf.subSamplingH), *core->memory);
+                data[i] = new VSPlaneData(static_cast<size_t>(stride[i]) * (height >> format.vf.subSamplingH), *core->memory);
             }
         }
     }
