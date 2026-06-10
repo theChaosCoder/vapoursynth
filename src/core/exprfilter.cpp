@@ -325,6 +325,17 @@ static void VS_CC exprCreate(const VSMap *in, VSMap *out, void *userData, VSCore
 
         int cpulevel = vs_get_cpulevel(core);
 
+        // The bytecode interpreter (used when the CPU level is forced to none)
+        // has no half-float support and would silently emit zeroed output, so
+        // reject half-float clips on that path instead of computing garbage.
+        if (cpulevel <= VS_CPU_LEVEL_NONE && nexpr > 0) {
+            bool anyF16 = d->vi.format.sampleType == stFloat && d->vi.format.bytesPerSample == 2;
+            for (int i = 0; i < d->numInputs && !anyF16; i++)
+                anyF16 = vi[i]->format.sampleType == stFloat && vi[i]->format.bytesPerSample == 2;
+            if (anyF16)
+                throw std::runtime_error("the Expr interpreter (CPU level none) does not support half-float (16-bit float) clips");
+        }
+
         for (int i = 0; i < d->vi.format.numPlanes; i++) {
             if (!expr[i].empty()) {
                 d->plane[i] = poProcess;
