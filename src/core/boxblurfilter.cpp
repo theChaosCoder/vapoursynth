@@ -241,7 +241,6 @@ static const VSFrame *VS_CC boxBlurGetframe(int n, int activationReason, void *i
         VSFrame *dst = vsapi->newVideoFrame(fi, vsapi->getFrameWidth(src, 0), vsapi->getFrameHeight(src, 0), src, core);
         int bytesPerSample = fi->bytesPerSample;
         int radius = d->radius;
-        uint8_t *tmp = (radius > 1 && d->passes > 1) ? new uint8_t[bytesPerSample * vsapi->getFrameWidth(src, 0)] : nullptr;
 
         const uint8_t *srcp = vsapi->getReadPtr(src, 0);
         ptrdiff_t stride = vsapi->getStride(src, 0);
@@ -249,7 +248,13 @@ static const VSFrame *VS_CC boxBlurGetframe(int n, int activationReason, void *i
         int h = vsapi->getFrameHeight(src, 0);
         int w = vsapi->getFrameWidth(src, 0);
 
-        if (radius == 1) {
+        // The radius==1 fast path (processPlaneR1/F) unconditionally accesses src[2]
+        // and src[width-1], so it is only valid for width >= 3. Fall back to the
+        // bounds-clamped generic path for narrower planes to avoid out-of-bounds access.
+        bool useR1 = (radius == 1) && (w >= 3);
+        uint8_t *tmp = (!useR1 && d->passes > 1) ? new uint8_t[bytesPerSample * w] : nullptr;
+
+        if (useR1) {
             if (bytesPerSample == 1)
                 processPlaneR1<uint8_t>(srcp, dstp, stride, w, h, d->passes);
             else if (bytesPerSample == 2)
