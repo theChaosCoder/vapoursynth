@@ -646,7 +646,7 @@ static const VSFrame *VS_CC audioMixGetFrame16(int n, int activationReason, void
                     }
                 }
 
-                dstPtrs[dstIdx][i] = static_cast<int16_t>(tmp);
+                dstPtrs[dstIdx][i] = static_cast<int16_t>(vclamped);
             }
         }
 
