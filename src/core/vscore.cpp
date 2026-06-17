@@ -1085,7 +1085,10 @@ PVSFrame VSNode::getFrameInternal(int n, int activationReason, VSFrameContext *f
 
         if (cacheEnabled) {
             std::lock_guard<std::mutex> lock(cacheMutex);
-            if (cacheEnabled && (!cacheLastOnly || n == vi.numFrames - 1))
+            // vi.numFrames is 0 for audio nodes; use the right frame count so cacheLastOnly
+            // actually caches the final audio frame instead of never matching (n == -1).
+            int lastFrame = (nodeType == mtVideo ? vi.numFrames : ai.numFrames) - 1;
+            if (cacheEnabled && (!cacheLastOnly || n == lastFrame))
                 cache.insert(n, ref);
         }
 
