@@ -516,6 +516,8 @@ template <class T>
 void conv_plane_x(const void *src, ptrdiff_t src_stride, void *dst, ptrdiff_t dst_stride, const vs_generic_params &params, unsigned width, unsigned height)
 {
     void *tmp = vsh::vsh_aligned_malloc(width * sizeof(T), 64);
+    if (!tmp) // out of memory: bail instead of dereferencing a null scratch buffer
+        return;
     unsigned fwidth = params.matrixsize;
     unsigned support = fwidth / 2;
 
