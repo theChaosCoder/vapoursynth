@@ -84,6 +84,9 @@ public:
 
     size_t limit() const { return m_limit; }
 
+    // Best-effort snapshots: m_allocated and m_limit are each read atomically but not as a
+    // consistent pair. That is intentional — these only feed advisory cache-sizing / thread-
+    // throttling heuristics in the scheduler, where a momentarily stale reading is harmless.
     bool is_over_limit() const { return m_allocated > m_limit; }
 
     bool is_under_limit() const { return m_allocated < (m_limit >> 1); }
