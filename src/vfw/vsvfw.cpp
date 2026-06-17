@@ -766,8 +766,10 @@ bool VapourSynthStream::ReadFrame(void* lpBuffer, int n) {
 
         errSe = vssapi->createScript(nullptr);
         vssapi->evaluateBuffer(errSe, frameErrorScript.c_str(), "vfw_error.message");
+        // The synthetic script can fail to evaluate (e.g. the error text breaks the r"""..."""
+        // literal), leaving no output node. getOutputNode then returns null; guard getFrame.
         VSNode *node = vssapi->getOutputNode(errSe, 0);
-        f = vsapi->getFrame(0, node, nullptr, 0);
+        f = node ? vsapi->getFrame(0, node, nullptr, 0) : nullptr;
         vsapi->freeNode(node);
 
         if (!f) {
