@@ -180,7 +180,9 @@ bool/*success*/ AvfsWavFile::ReadMedia(
   }
 
   // do sample aligned bulk of transfer
-  if (remainingSize > sampleBlockSize) {
+  // Use >= so an exact single remaining block is handled here; with > it fell through to
+  // the ragged-tail path whose ASSERT(remainingSize < sampleBlockSize) then failed.
+  if (remainingSize >= sampleBlockSize) {
     ASSERT(offset%sampleBlockSize == 0);
     size_t partSize = remainingSize-remainingSize%sampleBlockSize;
     success = success && avs->GetAudio(log, buffer, offset/sampleBlockSize,
