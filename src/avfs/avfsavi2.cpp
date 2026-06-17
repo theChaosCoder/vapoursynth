@@ -692,57 +692,50 @@ bool/*success*/ AvfsAvi2File::Init(
     success = false;
   }
   else {
-    // Calculate max number of frames that can go in a 4GB segment.
-    maxSegFrameCount = (   avfsAvi2Max4GbDataLstSize
-                         - firstAudFramePackCount*maxFrameAudDataSize
-                         - indxPrePadSize
-                         - indxPostPadSize
-                       )
-                     /
-                       (   sizeof(RiffTag)
-                         + maxFrameAudDataSize
-                         + sizeof(RiffTag)
-                         + frameVidDataSize
-                         + frameVidAlignSize
-                         + sizeof(Avi2IndxEntry)*2
-                         + sizeof(Avi2OldIndxEntry)*2
-                       );
+    // Per-frame on-disk size and the fixed audio-preload + index-padding overhead. The
+    // budget is 4GB, or 1GB with AVFS_AVI_SmallSegments (slower startup in some players
+    // but more compatible). Compute the overhead in 64-bit and guard against underflow:
+    // an overhead larger than the budget would otherwise wrap the unsigned numerator to a
+    // huge value, giving a tiny fileSegCount, an oversized segment, and an undersized
+    // (32-bit-overflowed) allocation later -> heap buffer overflow.
+    const uint64_t segOverhead = uint64_t(firstAudFramePackCount)*maxFrameAudDataSize
+                               + indxPrePadSize + indxPostPadSize;
+    const unsigned segPerFrameSize = sizeof(RiffTag)
+                                   + maxFrameAudDataSize
+                                   + sizeof(RiffTag)
+                                   + frameVidDataSize
+                                   + frameVidAlignSize
+                                   + sizeof(Avi2IndxEntry)*2
+                                   + sizeof(Avi2OldIndxEntry)*2;
+    const uint64_t segBudget = avs->GetVarAsBool("AVFS_AVI_SmallSegments", false)
+                             ? avfsAvi2MaxDataLstSize : avfsAvi2Max4GbDataLstSize;
 
-    fileSegCount = (fileFrameCount+maxSegFrameCount-1)/maxSegFrameCount; // ceil!
-    ASSERT(fileSegCount);
-
-    if (/*fileSegCount > 1 &&*/ avs->GetVarAsBool("AVFS_AVI_SmallSegments", false))
-    {
-      // Break file into 1GB segments instead of 4GB segments. Slows
-      // initialization of some applications (mplayer/mencoder, vlc), but
-      // may improve compatibility.
-      // Calculate max number of frames that can go in each segment and
-      // still have the first segment size <1GB.
-      maxSegFrameCount = (   avfsAvi2MaxDataLstSize
-                           - firstAudFramePackCount*maxFrameAudDataSize
-                           - indxPrePadSize
-                           - indxPostPadSize
-                         )
-                       /
-                         (   sizeof(RiffTag)
-                           + maxFrameAudDataSize
-                           + sizeof(RiffTag)
-                           + frameVidDataSize
-                           + frameVidAlignSize
-                           + sizeof(Avi2IndxEntry)*2
-                           + sizeof(Avi2OldIndxEntry)*2
-                         );
-
-      fileSegCount = (fileFrameCount+maxSegFrameCount-1)/maxSegFrameCount;
-    }
-
-    if (fileSegCount > avfsAvi2MaxSuperIndxEntryCount) {
-      // Don't silently clamp: that would emit an AVI whose super-index covers fewer frames
-      // than the clip, silently truncating the presented video/audio. Fail instead.
-      log->Printf(L"AvfsAvi2File::Init: clip too long to represent as a single AVI (needs %u segments, max %u).\n",
-                  fileSegCount, unsigned(avfsAvi2MaxSuperIndxEntryCount));
+    if (segOverhead >= segBudget || segPerFrameSize == 0) {
+      log->Printf(L"AvfsAvi2File::Init: audio preload too large for the AVI segment budget.\n");
       success = false;
       fileSegCount = 0;
+    }
+    else {
+      maxSegFrameCount = unsigned((segBudget - segOverhead) / segPerFrameSize);
+
+      if (!maxSegFrameCount) {
+        log->Printf(L"AvfsAvi2File::Init: a single frame does not fit in an AVI segment.\n");
+        success = false;
+        fileSegCount = 0;
+      }
+      else {
+        fileSegCount = (fileFrameCount+maxSegFrameCount-1)/maxSegFrameCount; // ceil!
+        ASSERT(fileSegCount);
+
+        if (fileSegCount > avfsAvi2MaxSuperIndxEntryCount) {
+          // Don't silently clamp: that would emit an AVI whose super-index covers fewer
+          // frames than the clip, silently truncating the presented video/audio. Fail.
+          log->Printf(L"AvfsAvi2File::Init: clip too long to represent as a single AVI (needs %u segments, max %u).\n",
+                      fileSegCount, unsigned(avfsAvi2MaxSuperIndxEntryCount));
+          success = false;
+          fileSegCount = 0;
+        }
+      }
     }
   }
 
