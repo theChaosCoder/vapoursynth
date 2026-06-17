@@ -115,7 +115,10 @@ void VSFunction::call(const VSMap *in, VSMap *out) {
 ///////////////
 
 VSPlaneData::VSPlaneData(size_t dataSize, vs::MemoryUse &mem) noexcept : refcount(1), mem(mem), size(dataSize + 2 * VSFrame::guardSpace) {
-    data = mem.allocate(size + 2 * VSFrame::guardSpace);
+    // size already accounts for both guard regions; allocating size + 2*guardSpace
+    // over-allocated and left 'size' inconsistent with the real allocation (the copy
+    // constructor allocates and memcpys exactly 'size' bytes).
+    data = mem.allocate(size);
     assert(data);
     if (!data)
         VS_FATAL_ERROR("Failed to allocate memory for plane. Out of memory.");
