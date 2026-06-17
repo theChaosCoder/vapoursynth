@@ -29,8 +29,16 @@ static bool isAsciiPrintable(const std::string &s) {
 }
 
 static std::string doubleToString(double v) {
-    char buffer[100];
+    // chars_format::fixed can need up to ~325 chars for a large-magnitude double; a 100-byte
+    // buffer overflowed (to_chars then sets ec=value_too_large and leaves buffer unspecified,
+    // which the old code ignored and copied as garbage).
+    char buffer[350];
     auto res = std::to_chars(buffer, buffer + sizeof(buffer), v, std::chars_format::fixed);
+    if (res.ec != std::errc{}) {
+        res = std::to_chars(buffer, buffer + sizeof(buffer), v, std::chars_format::general);
+        if (res.ec != std::errc{})
+            return std::to_string(v);
+    }
     return std::string(buffer, res.ptr - buffer);
 }
 
