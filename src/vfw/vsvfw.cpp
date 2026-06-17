@@ -504,8 +504,18 @@ bool VapourSynthFile::DelayInit2() {
             error_script += error_msg;
             error_script += ErrorScript2;
             se = vssapi->createScript(nullptr);
-            vssapi->evaluateBuffer(se, error_script.c_str(), "vfw_error.message");
-            videoNode = vssapi->getOutputNode(se, 0);
+            // If the synthetic error script fails to evaluate (e.g. the embedded error text
+            // breaks the r"""..."""  literal), there is no output node; guard against a null
+            // node instead of dereferencing it in getVideoInfo.
+            if (vssapi->evaluateBuffer(se, error_script.c_str(), "vfw_error.message"))
+                videoNode = nullptr;
+            else
+                videoNode = vssapi->getOutputNode(se, 0);
+            if (!videoNode) {
+                vssapi->freeScript(se);
+                se = nullptr;
+                return false;
+            }
             vi = vsapi->getVideoInfo(videoNode);
             return true;
         }
