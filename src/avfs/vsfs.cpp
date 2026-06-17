@@ -269,6 +269,8 @@ bool VapourSynther::GetAudio(AvfsLog_ *log, void *buf, __int64 start, unsigned c
 
     for (int i = startFrame; i <= endFrame; i++) {
         const VSFrame *f = vsapi->getFrame(i, audioNode, nullptr, 0);
+        if (!f) // audio frame production failed (filter error / OOM); report read failure
+            return false;
         int64_t firstFrameSample = i * static_cast<int64_t>(VS_AUDIO_FRAME_SAMPLES);
         size_t offset = 0;
         int copyLength = VS_AUDIO_FRAME_SAMPLES;
