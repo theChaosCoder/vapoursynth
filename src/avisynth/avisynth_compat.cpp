@@ -964,6 +964,13 @@ void FakeAvisynth::AddFunction(const char *name, const char *params, ApplyFunc a
                 }
             }
 
+            // A malformed string (missing ']' or ending right after it) leaves paramPos at the
+            // end; the type character below would then read past the parameter string.
+            if (paramPos >= paramLength) {
+                vsapi->logMessage(mtWarning, ("Avisynth Compat: malformed parameter string, skipping importing " + fname).c_str(), core);
+                return;
+            }
+
             newArgs += argName + ":" + charToFilterArgumentString(params[paramPos]) + ":opt;";
             parsedArgs.push_back(AvisynthArgs(argName, params[paramPos++], false));
         } else {
