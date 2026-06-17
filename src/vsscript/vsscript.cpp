@@ -206,11 +206,13 @@ static void realInit() VS_NOEXCEPT {
     }
     s = p_PyGILState_Ensure();
     if (import_vapoursynth()) {
+        p_PyEval_SaveThread(); // release the GIL acquired above before bailing out
         FREE_LIBRARY(libraryHandle);
         extendedErrorMessage = "Failed to import the VapourSynth Python module.";
         return;
     }
     if (vpy4_initVSScript()) {
+        p_PyEval_SaveThread(); // release the GIL acquired above before bailing out
         FREE_LIBRARY(libraryHandle);
         extendedErrorMessage = "Failed to initialize the VapourSynth Python module for VSScript use.";
         return;
