@@ -506,8 +506,10 @@ static const VSFrame *VS_CC textGetFrame(int n, int activationReason, void *inst
         int width = vsapi->getFrameWidth(src, 0);
         int height = vsapi->getFrameHeight(src, 0);
 
-        int minimum_width = 2 * margin_h + character_width * d->scale;
-        int minimum_height = 2 * margin_v + character_height * d->scale;
+        // Compute in 64-bit: character_width/height * scale would otherwise overflow int for
+        // large scale, wrapping negative and bypassing this guard (then drawing out of bounds).
+        int64_t minimum_width = 2LL * margin_h + static_cast<int64_t>(character_width) * d->scale;
+        int64_t minimum_height = 2LL * margin_v + static_cast<int64_t>(character_height) * d->scale;
 
         if (width < minimum_width || height < minimum_height) {
             vsapi->freeFrame(src);
