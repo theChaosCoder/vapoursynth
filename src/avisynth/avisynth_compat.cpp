@@ -378,7 +378,9 @@ const VSFrame *FakeAvisynth::avsToVSFrame(VideoFrame *frame) {
     it = ownedFrames.begin();
 
     while (it != ownedFrames.end()) {
-        if (it->first->refcount == 0 || it->first->refcount == 9000) {
+        // Free frames that AVS no longer references. The old extra "refcount == 9000" magic
+        // sentinel can never be true (refcounts never reach it), so it is removed as dead code.
+        if (it->first->refcount == 0) {
             delete it->first;
             vsapi->freeFrame(it->second);
             it = ownedFrames.erase(it);
