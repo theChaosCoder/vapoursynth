@@ -103,7 +103,7 @@ std::string convertVSMapToJSON(const VSMap *map, const VSAPI *vsapi) {
                     int typeHint = vsapi->mapGetDataTypeHint(map, key, j, nullptr);
                     jsonStr += (j ? ", " : "");
                     if (typeHint == dtUtf8 || (typeHint == dtUnknown && vsapi->mapGetDataSize(map, key, j, nullptr) < 200 && isAsciiPrintable(std::string(vsapi->mapGetData(map, key, j, nullptr), vsapi->mapGetDataSize(map, key, j, nullptr)))))
-                        jsonStr += escapeJSONString(vsapi->mapGetData(map, key, j, nullptr));
+                        jsonStr += escapeJSONString(std::string(vsapi->mapGetData(map, key, j, nullptr), vsapi->mapGetDataSize(map, key, j, nullptr)));
                     else
                         jsonStr += "\"[binary data size: " + std::to_string(vsapi->mapGetDataSize(map, key, j, nullptr)) + "]\"";
                 }
