@@ -835,12 +835,22 @@ HRESULT VapourSynthStream::Read2(LONG lStart, LONG lSamples, LPVOID lpBuffer, LO
             lSamples = std::max<long>(static_cast<long>(ai->numSamples - lStart), 0);
 
         size_t bytesPerOutputSample = (ai->format.bitsPerSample + 7) / 8;
+        size_t blockAlign = bytesPerOutputSample * ai->format.numChannels;
 
-        LONG bytes = static_cast<LONG>(lSamples * bytesPerOutputSample * ai->format.numChannels);
-        if (lpBuffer && bytes > cbBuffer) {
-            lSamples = static_cast<LONG>(cbBuffer / (bytesPerOutputSample * ai->format.numChannels));
-            bytes = static_cast<LONG>(lSamples * bytesPerOutputSample * ai->format.numChannels);
+        // Compute the byte count in size_t and clamp the sample count so it fits in LONG.
+        // The previous code multiplied in size_t and narrowed to LONG, which could overflow
+        // to a negative value that bypassed the cbBuffer bound check (out-of-bounds write).
+        if (lSamples < 0)
+            lSamples = 0;
+        if (blockAlign && static_cast<size_t>(lSamples) > static_cast<size_t>(LONG_MAX) / blockAlign)
+            lSamples = static_cast<LONG>(static_cast<size_t>(LONG_MAX) / blockAlign);
+
+        size_t byteCount = static_cast<size_t>(lSamples) * blockAlign;
+        if (lpBuffer && cbBuffer >= 0 && byteCount > static_cast<size_t>(cbBuffer)) {
+            lSamples = blockAlign ? static_cast<LONG>(static_cast<size_t>(cbBuffer) / blockAlign) : 0;
+            byteCount = static_cast<size_t>(lSamples) * blockAlign;
         }
+        LONG bytes = static_cast<LONG>(byteCount);
         if (plBytes)
             *plBytes = bytes;
         if (plSamples)
