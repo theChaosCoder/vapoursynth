@@ -148,44 +148,13 @@ uint8_t *MemoryUse::allocate_from_freelist(size_t size)
     return nullptr;
 }
 
-size_t MemoryUse::deallocate_to_system(uint8_t *ptr, size_t size)
+// Caller must hold m_mutex. Frees freelist buffers (picked at random to avoid
+// thrashing) until total tracked memory is back under the limit.
+void MemoryUse::gc_freelist_locked()
 {
-#ifdef DEBUG_STATS
-    if (size > SYSTEM_ALLOCATOR_THRESHOLD)
-        ++m_debug_stats->large_free_count;
-    else
-        ++m_debug_stats->small_free_count;
-#endif
-
-    do_deallocate(ptr);
-    return m_allocated.fetch_sub(size) - size;
-}
-
-size_t MemoryUse::deallocate_to_freelist(uint8_t *ptr, size_t size)
-{
-    std::lock_guard<std::mutex> lock{ m_mutex };
-    m_freelist.emplace(size, ptr);
-    m_freelist_size += size;
-    return m_allocated.fetch_sub(size) - size;
-}
-
-void MemoryUse::gc_freelist()
-{
-    size_t total = m_allocated + m_freelist_size;
-    size_t limit = m_limit;
-
-    while (total > limit) {
-        std::unique_lock<std::mutex> lock{ m_mutex };
-
+    while (m_allocated + m_freelist_size > m_limit) {
         // Freelist is already empty. All remaining memory is working memory.
         if (m_freelist.empty())
-            return;
-
-        // Recalculate while holding the mutex.
-        total = m_allocated + m_freelist_size;
-        limit = m_limit;
-
-        if (total <= limit)
             return;
 
         // Pick a random buffer to minimize the risk of thrashing.
@@ -203,16 +172,19 @@ void MemoryUse::gc_freelist()
         m_freelist.erase(iter);
         m_freelist_size -= size;
 
-        lock.unlock();
-
         // Buffer was on the freelist. Do not change allocated bytes counter.
         do_deallocate(ptr);
-        total -= size;
 
 #ifdef DEBUG_STATS
         ++m_debug_stats->gc_count;
 #endif
     }
+}
+
+void MemoryUse::gc_freelist()
+{
+    std::lock_guard<std::mutex> lock{ m_mutex };
+    gc_freelist_locked();
 }
 
 uint8_t *MemoryUse::allocate(size_t size)
@@ -241,19 +213,41 @@ void MemoryUse::deallocate(uint8_t *buf)
     size_t size = header->size;
     bool to_freelist = size > SYSTEM_ALLOCATOR_THRESHOLD;
 
-    size_t allocated;
-    if (to_freelist)
-        allocated = deallocate_to_freelist(raw_ptr, size);
+#ifdef DEBUG_STATS
+    if (size > SYSTEM_ALLOCATOR_THRESHOLD)
+        ++m_debug_stats->large_free_count;
     else
-        allocated = deallocate_to_system(raw_ptr, size);
+        ++m_debug_stats->small_free_count;
+#endif
 
-    if (m_core_freed && allocated == 0) {
-        delete this;
-        return;
+    // A system-allocator buffer can be freed without the mutex; it touches no shared
+    // bookkeeping other than m_allocated, which is decremented under the lock below.
+    if (!to_freelist)
+        do_deallocate(raw_ptr);
+
+    bool destroy;
+    {
+        std::lock_guard<std::mutex> lock{ m_mutex };
+
+        if (to_freelist) {
+            m_freelist.emplace(size, raw_ptr);
+            m_freelist_size += size;
+        }
+
+        size_t allocated = m_allocated.fetch_sub(size) - size;
+
+        if (to_freelist)
+            gc_freelist_locked();
+
+        // Decide destruction under the same lock that guards every freelist mutation
+        // and the ownership handover, so it cannot race with another deallocate() or
+        // with on_core_freed(): no lost-delete, no double-free, and no thread is ever
+        // left operating on a destroyed MemoryUse / its mutex.
+        destroy = m_core_freed && allocated == 0;
     }
 
-    if (to_freelist)
-        gc_freelist();
+    if (destroy)
+        delete this;
 }
 
 size_t MemoryUse::set_limit(size_t bytes)
@@ -265,15 +259,17 @@ size_t MemoryUse::set_limit(size_t bytes)
 
 void MemoryUse::on_core_freed()
 {
-    bool was_idle = m_allocated == 0;
-
-    m_core_freed = true;
-
-    // Only the core can create a new allocation from the zero-memory state.
-    if (was_idle) {
-        assert(!m_allocated);
-        delete this;
+    bool destroy;
+    {
+        std::lock_guard<std::mutex> lock{ m_mutex };
+        m_core_freed = true;
+        // Serialized with deallocate()'s decrement-and-destroy decision via m_mutex.
+        // Once the core is gone, no new allocation can be made from the zero state.
+        destroy = m_allocated == 0;
     }
+
+    if (destroy)
+        delete this;
 }
 
 } // namespace vs
