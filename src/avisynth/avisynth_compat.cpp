@@ -865,7 +865,11 @@ static void VS_CC fakeAvisynthFunctionWrapper(const VSMap *in, VSMap *out, void 
         PClip clip = ret.AsClip();
 
         PrefetchInfo prefetchInfo = getPrefetchInfo(wf->name, in, core, vsapi);
-        std::unique_ptr<WrappedClip> filterData(new WrappedClip(wf->name, clip, preFetchClips, prefetchInfo, fakeEnv.get()));
+        // Hand ownership of the FakeAvisynth to the WrappedClip (whose destructor deletes it).
+        // Using release() rather than get() makes the WrappedClip the sole owner, so the
+        // non-clip paths below correctly destroy fakeEnv (fixing a leak) and an early return
+        // here does not double-free it.
+        std::unique_ptr<WrappedClip> filterData(new WrappedClip(wf->name, clip, preFetchClips, prefetchInfo, fakeEnv.release()));
 
         if (!filterData->preFetchClips.empty())
             filterData->fakeEnv->uglyNode = filterData->preFetchClips.front();
@@ -919,8 +923,8 @@ static void VS_CC fakeAvisynthFunctionWrapper(const VSMap *in, VSMap *out, void 
     } else if (ret.IsString()) {
         vsapi->mapSetData(out, "val", ret.AsString(), -1, dtUtf8, maReplace);
     }
-
-    fakeEnv.release();
+    // No unconditional fakeEnv.release() here: on the clip path ownership was already handed
+    // to the WrappedClip above; on the non-clip paths the unique_ptr must destroy fakeEnv.
 }
 
 void FakeAvisynth::AddFunction(const char *name, const char *params, ApplyFunc apply, void *user_data) {
