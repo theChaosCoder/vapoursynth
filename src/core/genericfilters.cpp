@@ -452,6 +452,11 @@ static const VSFrame *VS_CC genericGetframe(int n, int activationReason, void *i
                 throw std::runtime_error("Width must be bigger than convolution radius.");
             if (op == GenericConvolution && d->convolution_type == ConvolutionVertical && d->matrix_elements / 2 >= planeHeight(d->vi, d->vi->format.numPlanes - 1))
                 throw std::runtime_error("Height must be bigger than convolution radius.");
+            if (op == GenericConvolution && d->convolution_type == ConvolutionSquare) {
+                int radius = (d->matrix_elements == 9) ? 1 : 2;
+                if (radius >= planeWidth(d->vi, d->vi->format.numPlanes - 1) || radius >= planeHeight(d->vi, d->vi->format.numPlanes - 1))
+                    throw std::runtime_error("Width and height must be bigger than convolution radius.");
+            }
         } catch (const std::runtime_error &error) {
             vsapi->setFilterError((d->filter_name + ": "s + error.what()).c_str(), frameCtx);
             vsapi->freeFrame(src);
