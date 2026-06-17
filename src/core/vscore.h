@@ -428,6 +428,11 @@ private:
     int numPlanes;
     VSMap properties;
     VSCore *core;
+    // Cached at construction so ~VSFrame() never dereferences core->enableFrameRefDebug:
+    // a frame may outlive its core (framebuffers are designed to), and the VSCore object is
+    // freed once all filter instances are gone, so reading through core in the destructor
+    // would be a use-after-free.
+    bool frameRefDebug;
 
     std::string debugAllocationInfo;
     static std::atomic<uint64_t> allocationSeq;
