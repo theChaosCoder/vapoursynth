@@ -737,7 +737,12 @@ bool/*success*/ AvfsAvi2File::Init(
     }
 
     if (fileSegCount > avfsAvi2MaxSuperIndxEntryCount) {
-      fileSegCount = avfsAvi2MaxSuperIndxEntryCount;
+      // Don't silently clamp: that would emit an AVI whose super-index covers fewer frames
+      // than the clip, silently truncating the presented video/audio. Fail instead.
+      log->Printf(L"AvfsAvi2File::Init: clip too long to represent as a single AVI (needs %u segments, max %u).\n",
+                  fileSegCount, unsigned(avfsAvi2MaxSuperIndxEntryCount));
+      success = false;
+      fileSegCount = 0;
     }
   }
 
