@@ -189,7 +189,11 @@ void MemoryUse::gc_freelist()
 
 uint8_t *MemoryUse::allocate(size_t size)
 {
-    assert(size < SIZE_MAX - 4095 - 64);
+    // Guard the size rounding below against wraparound. This used to be only an assert,
+    // which is compiled out in release builds: a huge size would then wrap to a tiny
+    // allocation while the caller believed it owned 'size' bytes -> heap buffer overflow.
+    if (size > SIZE_MAX - 4096 - ALIGNMENT)
+        return nullptr;
 
     size_t aligned_size = (size + ALIGNMENT + (ALIGNMENT - 1)) & ~static_cast<size_t>(ALIGNMENT - 1);
     size_t page_aligned_size = (aligned_size + 4095) & ~static_cast<size_t>(4095);
