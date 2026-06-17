@@ -984,6 +984,7 @@ static VSNode *VS_CC createAudioFilter2(const char *name, const VSAudioInfo *ai,
 }
 
 static int VS_CC setLinearFilter(VSNode *node) VS_NOEXCEPT {
+    assert(node);
     return node->setLinear();
 }
 
@@ -1033,6 +1034,7 @@ static const VSAudioInfo *VS_CC getAudioInfo(VSNode *node) VS_NOEXCEPT {
 }
 
 static const VSAudioFormat *VS_CC getAudioFrameFormat(const VSFrame *f) VS_NOEXCEPT {
+    assert(f);
     return f->getAudioFormat();
 }
 
@@ -1111,6 +1113,7 @@ static int VS_CC getNumNodeDependencies(VSNode *node) VS_NOEXCEPT {
 }
 
 static const VSFilterDependency *VS_CC getNodeDependency(VSNode *node, int index) VS_NOEXCEPT {
+    assert(node);
     return node->getDependency(index);
 }
 
