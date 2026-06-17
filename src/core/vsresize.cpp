@@ -331,13 +331,26 @@ void propagate_sar(const VSMap *src_props, VSMap *dst_props, const zimg_image_fo
         vsapi->mapDeleteKey(dst_props, "_SARNum");
         vsapi->mapDeleteKey(dst_props, "_SARDen");
     } else {
-        if (!std::isnan(src_format.active_region.width) && src_format.active_region.width != src_format.width)
-            muldivRational(&sar_num, &sar_den, std::llround(src_format.active_region.width * 16), static_cast<int64_t>(dst_format.width) * 16);
+        bool useActiveW = !std::isnan(src_format.active_region.width) && src_format.active_region.width != src_format.width;
+        bool useActiveH = !std::isnan(src_format.active_region.height) && src_format.active_region.height != src_format.height;
+        int64_t activeW16 = std::llround(src_format.active_region.width * 16);
+        int64_t activeH16 = std::llround(src_format.active_region.height * 16);
+
+        // A tiny active region can round to zero, which would zero a muldivRational
+        // factor (-> _SARNum or _SARDen == 0, an invalid rational). Drop the SAR instead.
+        if ((useActiveW && activeW16 <= 0) || (useActiveH && activeH16 <= 0)) {
+            vsapi->mapDeleteKey(dst_props, "_SARNum");
+            vsapi->mapDeleteKey(dst_props, "_SARDen");
+            return;
+        }
+
+        if (useActiveW)
+            muldivRational(&sar_num, &sar_den, activeW16, static_cast<int64_t>(dst_format.width) * 16);
         else
             muldivRational(&sar_num, &sar_den, src_format.width, dst_format.width);
 
-        if (!std::isnan(src_format.active_region.height) && src_format.active_region.height != src_format.height)
-            muldivRational(&sar_num, &sar_den, static_cast<int64_t>(dst_format.height) * 16, std::llround(src_format.active_region.height * 16));
+        if (useActiveH)
+            muldivRational(&sar_num, &sar_den, static_cast<int64_t>(dst_format.height) * 16, activeH16);
         else
             muldivRational(&sar_num, &sar_den, dst_format.height, src_format.height);
 
