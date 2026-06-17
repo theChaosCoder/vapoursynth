@@ -145,7 +145,11 @@ static const VSFrame *VS_CC getFrame(int n, VSNode *node, char *errorMsg, int bu
 static void VS_CC requestFrameFilter(int n, VSNode *node, VSFrameContext *frameCtx) VS_NOEXCEPT {
     assert(node && frameCtx);
     int numFrames = (node->getNodeType() == mtVideo) ? node->getVideoInfo().numFrames : node->getAudioInfo().numFrames;
-    if (n >= numFrames)
+    // Clamp both ends: a negative n would otherwise reach startInternalRequest and trip a
+    // fatal "Negative frame request" -> std::terminate. Mirror the existing upper clamp.
+    if (n < 0)
+        n = 0;
+    else if (n >= numFrames)
         n = numFrames - 1;
     frameCtx->reqList.emplace_back(NodeOutputKey(node, n));
 }
