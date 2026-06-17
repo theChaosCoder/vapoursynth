@@ -325,7 +325,9 @@ static int VS_CC getAvailableOutputNodes(VSScript *handle, int size, int *dst) V
     assert(size <= 0 || dst);
     std::lock_guard<std::mutex> lock(vsscriptlock);
     int count = vpy4_getAvailableOutputNodes(handle, size, dst);
-    std::sort(dst, dst + std::min(size, count));
+    int n = std::min(size, count);
+    if (n > 0) // guard against a negative size producing a negative/invalid sort range
+        std::sort(dst, dst + n);
     return count;
 }
 
