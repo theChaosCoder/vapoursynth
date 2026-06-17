@@ -311,6 +311,10 @@ public:
             if (detach())
                 it = data->data.find(key);
             data->data.erase(it);
+            // Keep the error flag consistent with the special _Error entry, otherwise
+            // getErrorMessage() would look up a missing key.
+            if (key == "_Error")
+                data->error = false;
             return true;
         }
         return false;
@@ -368,10 +372,13 @@ public:
 
     const char *getErrorMessage() const {
         if (data->error) {
-            return reinterpret_cast<VSDataArray *>(data->data.at("_Error").get())->at(0).data.c_str();
-        } else {
-            return nullptr;
+            // Use find() rather than at(): a thrown std::out_of_range would escape the
+            // noexcept C API (mapGetError) and call std::terminate.
+            auto it = data->data.find("_Error");
+            if (it != data->data.end())
+                return reinterpret_cast<VSDataArray *>(it->second.get())->at(0).data.c_str();
         }
+        return nullptr;
     }
 
     bool isV3Compatible() const noexcept;
