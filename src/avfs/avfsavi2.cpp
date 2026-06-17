@@ -588,6 +588,14 @@ bool/*success*/ AvfsAvi2File::Init(
   const char* fourcc;
   bool noInterleave = false;
 
+  // The AVI headers below divide by the frame rate; a zero numerator or denominator
+  // (e.g. a variable-/unknown-frame-rate source) would divide by zero (SIGFPE). A
+  // constant-rate AVI cannot represent such a clip, so fail cleanly instead of crashing.
+  if (vi.fps_numerator == 0 || vi.fps_denominator == 0) {
+    log->Printf(L"AvfsAvi2File::Init: clip has an undefined frame rate; cannot create AVI.\n");
+    return false;
+  }
+
   // Setup video attributes.
   vidFrameCount = unsigned(vi.num_frames);
   frameVidDataSize = vi.BMPSize();
