@@ -908,7 +908,10 @@ void VSNode::setVideoInfo3(const vs3::VSVideoInfo *vi, int numOutputs) {
     this->v3vi.flags = vs3::nfNoCache | vs3::nfIsCache;
     this->vi = core->VideoInfoFromV3(this->v3vi);
 
-    refcount = numOutputs;
+    // Do NOT set refcount = numOutputs here. This V4 node exposes only the first output
+    // (see warning above) and is owned by a single reference in the output map; the
+    // constructor already set refcount to 1. Overwriting it leaked the node whenever a
+    // V3 filter declared numOutputs > 1 (refcount never returned to 0 on release).
 }
 
 const char *VSNode::getCreationFunctionName(int level) const {
