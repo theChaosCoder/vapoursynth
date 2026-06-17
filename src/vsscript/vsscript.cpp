@@ -228,8 +228,13 @@ static VSScript *VS_CC createScript(VSCore *core) VS_NOEXCEPT {
     handle->core = core;
     handle->id = ++scriptID;
     if (vpy4_createScript(handle)) {
-        const VSAPI *vsapi = vpy4_getVSAPI(VAPOURSYNTH_API_VERSION);
-        vsapi->freeCore(core);
+        // handle->core is cleared to NULL once ownership of the core has been handed to the
+        // Python Core object. Only free it here if we still own it; otherwise the Python
+        // object's destructor would free the same core again (double-free).
+        if (handle->core) {
+            const VSAPI *vsapi = vpy4_getVSAPI(VAPOURSYNTH_API_VERSION);
+            vsapi->freeCore(handle->core);
+        }
         delete handle;
         return nullptr;
     } else {
