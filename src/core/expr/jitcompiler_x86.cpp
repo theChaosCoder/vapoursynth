@@ -718,8 +718,8 @@ do { \
 
         deferred.push_back([this, insn, l](Reg regptrs, XmmReg zero, Reg constants, std::unordered_map<int, std::pair<XmmReg, XmmReg>> &bytecodeRegs)
         {
-            char label[] = "label-0000";
-            sprintf(label, "label-%04d", l);
+            char label[24];
+            snprintf(label, sizeof(label), "label-%04d", l);
 
             auto t1 = bytecodeRegs[insn.src1];
             auto t2 = bytecodeRegs[insn.dst];
@@ -748,8 +748,8 @@ do { \
 
         deferred.push_back([this, insn, l](Reg regptrs, XmmReg zero, Reg constants, std::unordered_map<int, std::pair<XmmReg, XmmReg>> &bytecodeRegs)
         {
-            char label[] = "label-0000";
-            sprintf(label, "label-%04d", l);
+            char label[24];
+            snprintf(label, sizeof(label), "label-%04d", l);
 
             auto t1 = bytecodeRegs[insn.src1];
             auto t2 = bytecodeRegs[insn.dst];
@@ -778,8 +778,8 @@ do { \
 
         deferred.push_back([this, insn, l](Reg regptrs, XmmReg zero, Reg constants, std::unordered_map<int, std::pair<XmmReg, XmmReg>> &bytecodeRegs)
         {
-            char label[] = "label-0000";
-            sprintf(label, "label-%04d", l);
+            char label[24];
+            snprintf(label, sizeof(label), "label-%04d", l);
 
             auto t1 = bytecodeRegs[insn.src1];
             auto t2 = bytecodeRegs[insn.src2];
@@ -897,8 +897,8 @@ do { \
 
         deferred.push_back([this, issin, insn, l](Reg regptrs, XmmReg zero, Reg constants, std::unordered_map<int, std::pair<XmmReg, XmmReg>> &bytecodeRegs)
         {
-            char label[] = "label-0000";
-            sprintf(label, "label-%04d", l);
+            char label[24];
+            snprintf(label, sizeof(label), "label-%04d", l);
 
             auto t1 = bytecodeRegs[insn.src1];
             auto t3 = bytecodeRegs[insn.dst];
