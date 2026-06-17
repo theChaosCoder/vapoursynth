@@ -961,6 +961,17 @@ static void VS_CC levelsCreate(const VSMap *in, VSMap *out, void *userData, VSCo
     d->max_out = static_cast<float>(vsapi->mapGetFloat(in, "max_out", 0, &err));
     if (err)
         d->max_out = maxvalf;
+
+    // A zero input range (max_in == min_in) divides by zero in the transfer function and
+    // yields NaN in both the integer LUT and the float path. Force a non-zero range so the
+    // clamp turns it into a well-defined hard threshold (min_out below, max_out at/above).
+    if (d->max_in == d->min_in) {
+        if (d->vi->format.sampleType == stInteger)
+            d->max_in = d->min_in + 1.f;
+        else
+            d->max_in = std::nextafter(d->min_in, std::numeric_limits<float>::infinity());
+    }
+
     d->gamma = static_cast<float>(vsapi->mapGetFloat(in, "gamma", 0, &err));
     if (err)
         d->gamma = 1.f;
