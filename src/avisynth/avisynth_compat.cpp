@@ -550,7 +550,10 @@ WrappedClip::WrappedClip(const std::string &filterName, const PClip &clip, const
 }
 
 static void prefetchHelper(int n, VSNode *node, const PrefetchInfo &p, VSFrameContext *frameCtx, const VSAPI *vsapi) {
-    n /= p.div;
+    // Guard against div == 0 (e.g. Decimate/DGDecimate invoked with cycle == 1), which would
+    // raise SIGFPE. Treat it as no decimation grouping rather than crashing the process.
+    int div = p.div != 0 ? p.div : 1;
+    n /= div;
     n *= p.mul;
 
     for (int i = n + p.from; i <= n + p.to; i++) {
