@@ -314,6 +314,8 @@ static int VS_CC setVariable(VSScript *handle, const VSMap *vars) VS_NOEXCEPT {
 }
 
 static void VS_CC evalSetWorkingDir(VSScript *handle, int setCWD) VS_NOEXCEPT {
+    // Take the same lock all other accessors (and the evaluate path that reads setCWD) hold.
+    std::lock_guard<std::mutex> lock(vsscriptlock);
     handle->setCWD = setCWD;
 }
 
