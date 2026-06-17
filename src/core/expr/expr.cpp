@@ -1408,6 +1408,17 @@ void renameRegisters(std::vector<ExprInstruction> &code)
     std::unordered_map<int, int> table;
     std::set<int> freeList;
 
+    // Precompute the index of the last use (as a source operand) of each register so the
+    // liveness check below is O(1) instead of scanning the whole instruction tail per operand,
+    // which made this pass O(n^2) in the number of instructions.
+    std::unordered_map<int, size_t> lastUse;
+    for (size_t j = 0; j < code.size(); ++j) {
+        const ExprInstruction &insn2 = code[j];
+        if (insn2.src1 >= 0) lastUse[insn2.src1] = j;
+        if (insn2.src2 >= 0) lastUse[insn2.src2] = j;
+        if (insn2.src3 >= 0) lastUse[insn2.src3] = j;
+    }
+
     for (size_t i = 0; i < code.size(); ++i) {
         ExprInstruction &insn = code[i];
         int origRegs[4] = { insn.dst, insn.src1, insn.src2, insn.src3 };
@@ -1421,15 +1432,9 @@ void renameRegisters(std::vector<ExprInstruction> &code)
             if (it != table.end())
                 renamed[n] = it->second;
 
-            bool dead = true;
-
-            for (size_t j = i + 1; j < code.size(); ++j) {
-                const ExprInstruction &insn2 = code[j];
-                if (insn2.src1 == origRegs[n] || insn2.src2 == origRegs[n] || insn2.src3 == origRegs[n]) {
-                    dead = false;
-                    break;
-                }
-            }
+            // dead == no later instruction (j > i) uses origRegs[n] as a source operand
+            auto luIt = lastUse.find(origRegs[n]);
+            bool dead = !(luIt != lastUse.end() && luIt->second > i);
 
             if (dead)
                 freeList.insert(renamed[n]);
